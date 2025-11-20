@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  database:
+    image: mysql:8.0
+    container_name: finalearn_db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-finalearn123}
+      MYSQL_DATABASE: ${DB_NAME:-finalearn}
+      MYSQL_USER: ${DB_USER:-finalearn_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-finalearn_pass}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - finalearn_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Backend API
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: finalearn_backend
+    environment:
+      - DB_HOST=database
+      - DB_NAME=${DB_NAME:-finalearn}
+      - DB_USER=${DB_USER:-finalearn_user}
+      - DB_PASSWORD=${DB_PASSWORD:-finalearn_pass}
+      - DB_PORT=3306
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-us-central1}
+    ports:
+      - "8000:8000"
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    networks:
+      - finalearn_network
+    restart: unless-stopped
+
+  # Frontend App  
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: finalearn_frontend
+    environment:
+      - REACT_APP_API_BASE=http://localhost:8000
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - finalearn_network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  finalearn_network:
+    driver: bridge
