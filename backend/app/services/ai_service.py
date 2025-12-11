@@ -2,11 +2,9 @@
 import json
 import logging
 from typing import Any, Dict, Optional
-from google.cloud import aiplatform
+import google.generativeai as genai
 from fastapi import HTTPException
 from app.core.config import settings
-import vertexai
-from vertexai.language_models import TextGenerationModel
 
 logger = logging.getLogger(__name__)
 
@@ -183,49 +181,55 @@ Respond with:
 
 WAIT for the user's input and respond in JSON only.
 """
-        self.initialize_vertex_ai()
+        self.initialize_gemini()
 
-    def initialize_vertex_ai(self):
-        """Initialize Vertex AI if credentials are available"""
-        if settings.google_cloud_project:
+    def initialize_gemini(self):
+        """Initialize Google Gemini if API key is available"""
+        if settings.google_api_key:
             try:
-                vertexai.init(
-                    project=settings.google_cloud_project, 
-                    location=settings.google_cloud_location
-                )
-                self.model = TextGenerationModel.from_pretrained("text-bison@001")
-                logger.info("Vertex AI initialized successfully")
+                genai.configure(api_key=settings.google_api_key)
+                self.model = genai.GenerativeModel('gemini-pro')
+                logger.info("Google Gemini initialized successfully")
             except Exception as e:
-                logger.warning(f"Failed to initialize Vertex AI: {e}")
+                logger.warning(f"Failed to initialize Google Gemini: {e}")
                 self.model = None
         else:
-            logger.warning("GOOGLE_CLOUD_PROJECT not set. Using mock responses.")
+            logger.warning("GOOGLE_API_KEY not set. Using mock responses.")
             self.model = None
 
-    def call_vertex_ai(self, action_payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Call Vertex AI with the system prompt and user payload"""
+    def call_gemini_ai(self, action_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Call Google Gemini with the system prompt and user payload"""
         if not self.model:
-            logger.warning("Vertex AI not available, returning mock data")
+            logger.warning("Google Gemini not available, returning mock data")
             return self._get_mock_response(action_payload)
         
         try:
             user_content = json.dumps(action_payload)
             prompt = self.system_prompt + "\nUSER_INPUT:\n" + user_content
             
-            response = self.model.predict(prompt, max_output_tokens=800)
-            text = response.text if hasattr(response, 'text') else str(response)
+            response = self.model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=2048,
+                    temperature=0.7,
+                    top_p=0.8,
+                    top_k=40
+                )
+            )
+            
+            text = response.text
             
             try:
                 parsed = json.loads(text)
                 return parsed
             except Exception as e:
                 raise HTTPException(status_code=500, detail={
-                    "error": "Vertex AI did not return valid JSON",
+                    "error": "Google Gemini did not return valid JSON",
                     "raw_response": text,
                     "exception": str(e)
                 })
         except Exception as e:
-            logger.error(f"Error calling Vertex AI: {e}")
+            logger.error(f"Error calling Google Gemini: {e}")
             return self._get_mock_response(action_payload)
 
     def _get_mock_response(self, action_payload: Dict[str, Any]) -> Dict[str, Any]:

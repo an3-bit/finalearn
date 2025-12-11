@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api", tags=["assessments"])
 async def generate_assessment(req: AssessmentRequest):
     """Generate assessment for a module"""
     payload = {"action": "assessment", "module": req.module}
-    result = ai_service.call_vertex_ai(payload)
+    result = ai_service.call_gemini_ai(payload)
     
     # Save to database
     progress_service.save_assessment(req.module, result)
@@ -35,7 +35,7 @@ async def evaluate_trade(req: TradeEvalRequest):
             "reason": req.reason
         }
     }
-    return ai_service.call_vertex_ai(payload)
+    return ai_service.call_gemini_ai(payload)
 
 
 @router.post('/progress_decision', response_model=ProgressDecision)
@@ -46,4 +46,4 @@ async def progress_decision(req: ProgressRequest):
         "assessment_score": req.assessment_score,
         "trade_score": req.trade_score
     }}
-    return ai_service.call_vertex_ai(payload)
+    return ai_service.call_gemini_ai(payload)

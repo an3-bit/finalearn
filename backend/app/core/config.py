@@ -5,8 +5,11 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Google Cloud Configuration
+    # Google Gemini Configuration
+    google_api_key: Optional[str] = os.getenv("GOOGLE_API_KEY")
     google_cloud_project: Optional[str] = os.getenv("GOOGLE_CLOUD_PROJECT")
+    google_project_name: Optional[str] = os.getenv("GOOGLE_PROJECT_NAME")
+    google_project_number: Optional[str] = os.getenv("GOOGLE_PROJECT_NUMBER")
     google_cloud_location: str = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
     
     # Database Configuration

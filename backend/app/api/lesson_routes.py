@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/generate", tags=["lessons"])
 async def generate_plan(req: PlanRequest):
     """Generate a learning plan for a module"""
     payload = {"action": "generate_plan", "module": req.module, "duration": req.duration}
-    result = ai_service.call_vertex_ai(payload)
+    result = ai_service.call_gemini_ai(payload)
     
     # Save to database
     progress_service.save_lesson_plan(req.module, req.duration, result)
@@ -26,7 +26,7 @@ async def generate_plan(req: PlanRequest):
 async def generate_lesson(req: LessonRequest):
     """Generate lesson content for a topic"""
     payload = {"action": "generate_lesson", "topic": req.topic}
-    result = ai_service.call_vertex_ai(payload)
+    result = ai_service.call_gemini_ai(payload)
     
     # Save to database
     progress_service.save_lesson_content(req.topic, result)
@@ -38,7 +38,7 @@ async def generate_lesson(req: LessonRequest):
 async def generate_chart_tasks(req: ChartTaskRequest):
     """Generate chart tasks for a topic"""
     payload = {"action": "chart_tasks", "topic": req.topic}
-    result = ai_service.call_vertex_ai(payload)
+    result = ai_service.call_gemini_ai(payload)
     
     # Save to database
     progress_service.save_chart_tasks(req.topic, result)

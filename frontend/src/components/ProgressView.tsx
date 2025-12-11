@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getUserProgress } from '../api';
+import LessonCard from './LessonCard';
 
 interface Props {
   userId: string;
@@ -221,24 +222,6 @@ const ProgressView: React.FC<Props> = ({ userId }) => {
 
   return (
     <div className="progress-view">
-      {/* Navigation Tabs */}
-      <div className="progress-navigation">
-        {generatedPlan && (
-          <button 
-            className={`nav-tab ${activeView === 'plan' ? 'active' : ''}`}
-            onClick={() => setActiveView('plan')}
-          >
-            📚 Your Learning Path
-          </button>
-        )}
-        <button 
-          className={`nav-tab ${activeView === 'progress' ? 'active' : ''}`}
-          onClick={() => setActiveView('progress')}
-        >
-          📊 Progress Tracking
-        </button>
-      </div>
-
       {/* Generated Learning Plan View */}
       {activeView === 'plan' && generatedPlan && selectedModuleData && (
         <div className="learning-plan-view">
@@ -265,25 +248,45 @@ const ProgressView: React.FC<Props> = ({ userId }) => {
 
           {/* Learning Path Content */}
           <div className="plan-content">
-            <div className="plan-overview">
-              <h2>📋 Learning Overview</h2>
+            {/* Learning Overview Card */}
+            <div className="overview-card">
+              <div className="overview-header">
+                <h2>📋 Learning Overview</h2>
+                <p>Your personalized learning journey breakdown</p>
+              </div>
               <div className="overview-stats">
                 <div className="overview-stat">
-                  <span className="stat-number">{generatedPlan.weeks?.length || 0}</span>
-                  <span className="stat-label">Weeks</span>
+                  <div className="stat-icon">📅</div>
+                  <div className="stat-info">
+                    <span className="stat-number">{generatedPlan.weeks?.length || 0}</span>
+                    <span className="stat-label">Weeks</span>
+                  </div>
                 </div>
                 <div className="overview-stat">
-                  <span className="stat-number">
-                    {generatedPlan.weeks.reduce((total, week) => total + (week.days?.length || 0), 0)}
-                  </span>
-                  <span className="stat-label">Lessons</span>
+                  <div className="stat-icon">📚</div>
+                  <div className="stat-info">
+                    <span className="stat-number">
+                      {generatedPlan.weeks.reduce((total, week) => total + (week.days?.length || 0), 0)}
+                    </span>
+                    <span className="stat-label">Lessons</span>
+                  </div>
                 </div>
                 <div className="overview-stat">
-                  <span className="stat-number">
-                    {Math.round(generatedPlan.weeks.reduce((total, week) => 
-                      total + (week.days?.reduce((dayTotal, day) => dayTotal + (day.estimated_time || 0), 0) || 0), 0) / 60)}
-                  </span>
-                  <span className="stat-label">Hours</span>
+                  <div className="stat-icon">⏱️</div>
+                  <div className="stat-info">
+                    <span className="stat-number">
+                      {Math.round(generatedPlan.weeks.reduce((total, week) => 
+                        total + (week.days?.reduce((dayTotal, day) => dayTotal + (day.estimated_time || 0), 0) || 0), 0) / 60)}
+                    </span>
+                    <span className="stat-label">Hours</span>
+                  </div>
+                </div>
+                <div className="overview-stat">
+                  <div className="stat-icon">🎯</div>
+                  <div className="stat-info">
+                    <span className="stat-number">{selectedModuleData.level}</span>
+                    <span className="stat-label">Level</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -300,40 +303,30 @@ const ProgressView: React.FC<Props> = ({ userId }) => {
                   </div>
                   
                   <div className="days-grid">
-                    {week.days?.map((day, dayIndex) => (
-                      <div key={day.day} className="day-card">
-                        <div className="day-header">
-                          <span className="day-number">Day {day.day || 'N/A'}</span>
-                          <span className="day-time">{day.estimated_time || 0} min</span>
-                        </div>
-                        
-                        <h4 className="day-topic">{day.topic}</h4>
-                        <p className="day-content">{day.content ? day.content.substring(0, 150) : 'No content available'}...</p>
-                        
-                        <div className="day-activities">
-                          <h5>🎯 Activities ({day.activities?.length || 0}):</h5>
-                          <ul>
-                            {day.activities?.slice(0, 2).map((activity, index) => (
-                              <li key={index}>{activity}</li>
-                            )) || <li>No activities available</li>}
-                            {day.activities && day.activities.length > 2 && (
-                              <li>...and {day.activities.length - 2} more</li>
-                            )}
-                          </ul>
-                        </div>
-                        
-                        <div className="day-quiz">
-                          <span className="quiz-count">📝 {day.quiz_questions?.length || 0} quiz questions</span>
-                        </div>
-                        
-                        <button 
-                          className="start-lesson-btn"
-                          onClick={() => startLearning(weekIndex, dayIndex)}
-                        >
-                          🚀 Start Lesson
-                        </button>
-                      </div>
-                    ))}
+                    {week.days?.map((day, dayIndex) => {
+                      // Find progress data for this specific lesson
+                      const dayProgress = progressData.find(p => 
+                        p.module === selectedModuleData?.name && 
+                        p.week === week.week && 
+                        p.day === day.day
+                      );
+                      
+                      return (
+                        <LessonCard
+                          key={day.day}
+                          day={day}
+                          week={week.week}
+                          module={selectedModuleData?.name || 'Current Module'}
+                          userId={userId}
+                          progress={dayProgress ? {
+                            lesson_completed: dayProgress.lesson_completed,
+                            quiz_score: dayProgress.quiz_score || undefined,
+                            time_spent: dayProgress.time_spent || undefined,
+                            completed_at: dayProgress.completed_at || undefined
+                          } : undefined}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               ))}

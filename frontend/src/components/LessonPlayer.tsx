@@ -165,6 +165,7 @@ const LessonPlayer: React.FC<Props> = ({ userId }) => {
   const handleLessonComplete = async () => {
     const timeSpent = Math.round((Date.now() - lessonStartTime) / 1000);
     const quizScore = calculateQuizScore();
+    const quizDetails = getQuizDetails();
 
     try {
       // Use original lesson data if available, otherwise use defaults
@@ -182,17 +183,96 @@ const LessonPlayer: React.FC<Props> = ({ userId }) => {
       
       await updateUserProgress(progressData);
 
-      // Show completion message and navigate back to progress page
-      alert(`Lesson completed! 🎉\n\nQuiz Score: ${quizScore}%\nTime Spent: ${Math.round(timeSpent / 60)} minutes`);
-      
-      // Navigate back to progress page to see updated plan
-      navigate('/progress');
+      // Store completion data for chart activity
+      const completionData = {
+        topic: lesson?.topic || 'Unknown Topic',
+        module: originalLessonData?.module || 'Current Module',
+        day: originalLessonData?.day || 1,
+        quizScore,
+        timeSpent: Math.round(timeSpent / 60),
+        quizDetails
+      };
+      localStorage.setItem('lessonCompletionData', JSON.stringify(completionData));
+
+      // Show detailed completion summary
+      showCompletionSummary(quizScore, Math.round(timeSpent / 60), quizDetails);
       
     } catch (err) {
       console.error('Error updating progress:', err);
-      // Still navigate back even if progress update fails
-      navigate('/progress');
+      // Still show completion even if progress update fails
+      showCompletionSummary(quizScore, Math.round(timeSpent / 60), getQuizDetails());
     }
+  };
+
+  const getQuizDetails = () => {
+    const quizSteps = lesson?.steps.filter(step => step.type === 'quiz') || [];
+    const totalQuestions = quizSteps.reduce((sum, step) => sum + (step.questions?.length || 0), 0);
+    const answeredQuestions = Object.values(quizAnswers).flat().filter(answer => answer.trim()).length;
+    
+    return {
+      totalQuestions,
+      answeredQuestions,
+      quizStepsCompleted: Object.keys(quizAnswers).length,
+      totalQuizSteps: quizSteps.length
+    };
+  };
+
+  const showCompletionSummary = (quizScore: number, timeSpentMinutes: number, quizDetails: any) => {
+    const isGoodScore = quizScore >= 70;
+    const completionMessage = `
+🎉 Lesson Complete: ${lesson?.topic}
+
+📊 Your Performance:
+• Quiz Score: ${quizScore}% (${quizDetails.answeredQuestions}/${quizDetails.totalQuestions} questions)
+• Time Spent: ${timeSpentMinutes} minutes
+• Quiz Sections: ${quizDetails.quizStepsCompleted}/${quizDetails.totalQuizSteps} completed
+
+${isGoodScore ? 
+  '✅ Excellent work! Ready for chart practice.' : 
+  '📚 Good effort! Chart practice will help reinforce concepts.'}
+
+Next: Interactive chart analysis to apply what you learned!
+    `;
+
+    // Create a custom modal instead of alert for better UX
+    createCompletionModal(completionMessage, lesson?.topic || 'lesson');
+  };
+
+  const createCompletionModal = (message: string, topic: string) => {
+    const modal = document.createElement('div');
+    modal.className = 'lesson-completion-modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="completion-message">
+          <pre>${message}</pre>
+        </div>
+        <div class="modal-actions">
+          <button id="view-progress" class="btn btn-secondary">View Progress</button>
+          <button id="start-charts" class="btn btn-primary">Start Chart Practice</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Handle button clicks
+    document.getElementById('view-progress')?.addEventListener('click', () => {
+      document.body.removeChild(modal);
+      navigate('/progress');
+    });
+
+    document.getElementById('start-charts')?.addEventListener('click', () => {
+      document.body.removeChild(modal);
+      navigate(`/charts/${encodeURIComponent(topic)}`);
+    });
+
+    // Close modal on outside click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+        navigate('/progress');
+      }
+    });
   };
 
   const togglePause = () => {
