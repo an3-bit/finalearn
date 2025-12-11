@@ -5,6 +5,8 @@ from typing import Any, Dict, Optional
 from google.cloud import aiplatform
 from fastapi import HTTPException
 from app.core.config import settings
+import vertexai
+from vertexai.language_models import TextGenerationModel
 
 logger = logging.getLogger(__name__)
 
@@ -187,12 +189,11 @@ WAIT for the user's input and respond in JSON only.
         """Initialize Vertex AI if credentials are available"""
         if settings.google_cloud_project:
             try:
-                aiplatform.init(
+                vertexai.init(
                     project=settings.google_cloud_project, 
                     location=settings.google_cloud_location
                 )
-                MODEL_NAME = "text-bison@001"
-                self.model = aiplatform.TextGenerationModel.from_pretrained(MODEL_NAME)
+                self.model = TextGenerationModel.from_pretrained("text-bison@001")
                 logger.info("Vertex AI initialized successfully")
             except Exception as e:
                 logger.warning(f"Failed to initialize Vertex AI: {e}")
@@ -211,7 +212,7 @@ WAIT for the user's input and respond in JSON only.
             user_content = json.dumps(action_payload)
             prompt = self.system_prompt + "\nUSER_INPUT:\n" + user_content
             
-            response = self.model.generate(prompt=prompt, max_output_tokens=800)
+            response = self.model.predict(prompt, max_output_tokens=800)
             text = response.text if hasattr(response, 'text') else str(response)
             
             try:

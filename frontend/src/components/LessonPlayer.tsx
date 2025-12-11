@@ -18,10 +18,27 @@ const LessonPlayer: React.FC<Props> = ({ userId }) => {
   const [quizAnswers, setQuizAnswers] = useState<{ [stepIndex: number]: string[] }>({});
   const [lessonStartTime] = useState(Date.now());
   const [isPaused, setIsPaused] = useState(false);
+  const [originalLessonData, setOriginalLessonData] = useState<any>(null);
 
   useEffect(() => {
     if (topic) {
-      loadLesson(decodeURIComponent(topic));
+      // First check if we have lesson data from the learning plan
+      const storedLessonData = localStorage.getItem('currentLesson');
+      if (storedLessonData) {
+        try {
+          const lessonData = JSON.parse(storedLessonData);
+          console.log('LessonPlayer - Using stored lesson data:', lessonData);
+          setOriginalLessonData(lessonData);
+          loadLessonFromPlan(lessonData);
+          // Clear the stored data after using it
+          localStorage.removeItem('currentLesson');
+        } catch (error) {
+          console.error('Error parsing stored lesson data:', error);
+          loadLesson(decodeURIComponent(topic));
+        }
+      } else {
+        loadLesson(decodeURIComponent(topic));
+      }
     }
   }, [topic]);
 
@@ -40,6 +57,57 @@ const LessonPlayer: React.FC<Props> = ({ userId }) => {
       return () => clearInterval(timer);
     }
   }, [currentStepIndex, isPaused, timeLeft]);
+
+  const loadLessonFromPlan = (lessonData: any) => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Convert the lesson plan data to the LessonContent format expected by the player
+      const steps: LessonStep[] = [
+        {
+          step: 1,
+          type: 'concept',
+          content: lessonData.content || 'Welcome to this lesson!'
+        }
+      ];
+
+      // Add activities as application steps
+      if (lessonData.activities && lessonData.activities.length > 0) {
+        lessonData.activities.forEach((activity: string, index: number) => {
+          steps.push({
+            step: steps.length + 1,
+            type: 'application',
+            content: activity
+          });
+        });
+      }
+
+      // Add quiz questions as quiz steps
+      if (lessonData.quiz_questions && lessonData.quiz_questions.length > 0) {
+        steps.push({
+          step: steps.length + 1,
+          type: 'quiz',
+          content: 'Test your understanding of this lesson',
+          questions: lessonData.quiz_questions.map((q: any) => q.question)
+        });
+      }
+
+      const lessonContent: LessonContent = {
+        topic: lessonData.topic,
+        steps: steps
+      };
+      
+      console.log('LessonPlayer - Converted lesson content:', lessonContent);
+      setLesson(lessonContent);
+      setCurrentStepIndex(0);
+      setTimeLeft(5 * 60);
+    } catch (err) {
+      setError('Failed to load lesson content from learning plan. Please try again.');
+      console.error('Error loading lesson from plan:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadLesson = async (topicName: string) => {
     setLoading(true);
@@ -99,22 +167,31 @@ const LessonPlayer: React.FC<Props> = ({ userId }) => {
     const quizScore = calculateQuizScore();
 
     try {
-      await updateUserProgress({
+      // Use original lesson data if available, otherwise use defaults
+      const progressData = {
         user_id: userId,
-        module: 'Current Module', // You might want to pass this as a prop
-        week: 1, // You might want to calculate this
-        day: 1, // You might want to calculate this
+        module: originalLessonData?.module || 'Current Module',
+        week: originalLessonData?.week || 1,
+        day: originalLessonData?.day || 1,
         lesson_completed: true,
         quiz_score: quizScore,
         time_spent: timeSpent
-      });
+      };
 
-      // Navigate to chart view for the topic
-      if (topic) {
-        navigate(`/charts/${topic}`);
-      }
+      console.log('LessonPlayer - Updating progress with:', progressData);
+      
+      await updateUserProgress(progressData);
+
+      // Show completion message and navigate back to progress page
+      alert(`Lesson completed! 🎉\n\nQuiz Score: ${quizScore}%\nTime Spent: ${Math.round(timeSpent / 60)} minutes`);
+      
+      // Navigate back to progress page to see updated plan
+      navigate('/progress');
+      
     } catch (err) {
       console.error('Error updating progress:', err);
+      // Still navigate back even if progress update fails
+      navigate('/progress');
     }
   };
 
